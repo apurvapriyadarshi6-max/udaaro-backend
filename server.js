@@ -9,7 +9,7 @@ const app = express();
 
 /* ================= CONFIG ================= */
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 const SECRET = process.env.SECRET || "udaaro_secret_key";
 
 app.use(cors());
