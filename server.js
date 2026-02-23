@@ -17,9 +17,9 @@ app.use(express.json());
 
 /* ================= HEALTH ROUTES ================= */
 
-// Root route (Render needs this)
+// Root route (Render requirement)
 app.get("/", (req, res) => {
-  res.send("🚀 Udaaro Backend Live");
+  res.status(200).send("Udaaro Backend Live");
 });
 
 // Health check route
@@ -27,13 +27,12 @@ app.get("/healthz", (req, res) => {
   res.status(200).send("OK");
 });
 
-/* ================= DATA FOLDER SAFETY ================= */
+/* ================= DATA FOLDER SETUP ================= */
 
 const dataPath = path.join(__dirname, "data");
 
-// Ensure data folder exists
 if (!fs.existsSync(dataPath)) {
-  fs.mkdirSync(dataPath);
+  fs.mkdirSync(dataPath, { recursive: true });
 }
 
 /* ================= FILE HELPERS ================= */
@@ -42,11 +41,11 @@ function readData(fileName) {
   const filePath = path.join(dataPath, fileName);
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify([], null, 2));
+    fs.writeFileSync(filePath, "[]");
   }
 
   const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw || "[]");
+  return raw ? JSON.parse(raw) : [];
 }
 
 function writeData(fileName, data) {
@@ -65,7 +64,7 @@ app.post("/api/admin/login", (req, res) => {
     return res.status(500).json({ message: "Admin not configured" });
   }
 
-  const admin = JSON.parse(fs.readFileSync(adminFile));
+  const admin = JSON.parse(fs.readFileSync(adminFile, "utf-8"));
 
   if (email === admin.email && password === admin.password) {
     const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
@@ -178,6 +177,6 @@ app.delete("/api/mentors/:id", verifyToken, (req, res) => {
 
 /* ================= START SERVER ================= */
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
