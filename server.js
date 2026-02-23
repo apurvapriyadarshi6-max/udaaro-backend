@@ -12,15 +12,29 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET = process.env.SECRET || "udaaro_secret_key";
 
-app.use(
-  cors({
-    origin: "*",
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
+/* ================= HEALTH ROUTES ================= */
+
+// Root route (Render needs this)
+app.get("/", (req, res) => {
+  res.send("🚀 Udaaro Backend Live");
+});
+
+// Health check route
+app.get("/healthz", (req, res) => {
+  res.status(200).send("OK");
+});
+
+/* ================= DATA FOLDER SAFETY ================= */
+
 const dataPath = path.join(__dirname, "data");
+
+// Ensure data folder exists
+if (!fs.existsSync(dataPath)) {
+  fs.mkdirSync(dataPath);
+}
 
 /* ================= FILE HELPERS ================= */
 
@@ -31,8 +45,8 @@ function readData(fileName) {
     fs.writeFileSync(filePath, JSON.stringify([], null, 2));
   }
 
-  const data = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(data);
+  const raw = fs.readFileSync(filePath, "utf-8");
+  return JSON.parse(raw || "[]");
 }
 
 function writeData(fileName, data) {
@@ -78,7 +92,7 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* ================= PROTECTED GET ROUTES ================= */
+/* ================= PROTECTED ROUTES ================= */
 
 app.get("/api/founders", verifyToken, (req, res) => {
   res.json(readData("founders.json"));
@@ -92,7 +106,7 @@ app.get("/api/mentors", verifyToken, (req, res) => {
   res.json(readData("mentors.json"));
 });
 
-/* ================= PUBLIC POST ROUTES ================= */
+/* ================= PUBLIC ROUTES ================= */
 
 app.post("/api/founders", (req, res) => {
   const founders = readData("founders.json");
@@ -143,42 +157,27 @@ app.post("/api/mentors", (req, res) => {
 
 app.delete("/api/founders/:id", verifyToken, (req, res) => {
   const founders = readData("founders.json");
-
-  const updated = founders.filter(
-    (founder) => founder.id !== req.params.id
-  );
-
+  const updated = founders.filter(f => f.id !== req.params.id);
   writeData("founders.json", updated);
-
   res.json({ message: "Founder deleted successfully" });
 });
 
 app.delete("/api/investors/:id", verifyToken, (req, res) => {
   const investors = readData("investors.json");
-
-  const updated = investors.filter(
-    (investor) => investor.id !== req.params.id
-  );
-
+  const updated = investors.filter(i => i.id !== req.params.id);
   writeData("investors.json", updated);
-
   res.json({ message: "Investor deleted successfully" });
 });
 
 app.delete("/api/mentors/:id", verifyToken, (req, res) => {
   const mentors = readData("mentors.json");
-
-  const updated = mentors.filter(
-    (mentor) => mentor.id !== req.params.id
-  );
-
+  const updated = mentors.filter(m => m.id !== req.params.id);
   writeData("mentors.json", updated);
-
   res.json({ message: "Mentor deleted successfully" });
 });
 
 /* ================= START SERVER ================= */
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
