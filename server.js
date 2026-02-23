@@ -9,34 +9,18 @@ const app = express();
 
 /* ================= CONFIG ================= */
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 const SECRET = process.env.SECRET || "udaaro_secret_key";
 
-if (!PORT) {
-  console.error("❌ PORT is not defined!");
-  process.exit(1);
-}
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
-app.use(cors());
 app.use(express.json());
 
-/* ================= ROOT & HEALTH ================= */
-
-app.get("/", (req, res) => {
-  res.status(200).send("Udaaro Backend Live");
-});
-
-app.get("/healthz", (req, res) => {
-  res.status(200).json({ status: "OK" });
-});
-
-/* ================= DATA FOLDER ================= */
-
 const dataPath = path.join(__dirname, "data");
-
-if (!fs.existsSync(dataPath)) {
-  fs.mkdirSync(dataPath, { recursive: true });
-}
 
 /* ================= FILE HELPERS ================= */
 
@@ -44,10 +28,11 @@ function readData(fileName) {
   const filePath = path.join(dataPath, fileName);
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, "[]");
+    fs.writeFileSync(filePath, JSON.stringify([], null, 2));
   }
 
-  return JSON.parse(fs.readFileSync(filePath, "utf-8") || "[]");
+  const data = fs.readFileSync(filePath, "utf-8");
+  return JSON.parse(data);
 }
 
 function writeData(fileName, data) {
@@ -59,20 +44,21 @@ function writeData(fileName, data) {
 
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
+
   const adminFile = path.join(dataPath, "admin.json");
 
   if (!fs.existsSync(adminFile)) {
     return res.status(500).json({ message: "Admin not configured" });
   }
 
-  const admin = JSON.parse(fs.readFileSync(adminFile, "utf-8"));
+  const admin = JSON.parse(fs.readFileSync(adminFile));
 
   if (email === admin.email && password === admin.password) {
     const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
     return res.json({ token });
   }
 
-  return res.status(401).json({ message: "Invalid credentials" });
+  res.status(401).json({ message: "Invalid credentials" });
 });
 
 function verifyToken(req, res, next) {
@@ -87,12 +73,12 @@ function verifyToken(req, res, next) {
   try {
     jwt.verify(token, SECRET);
     next();
-  } catch (err) {
-    return res.status(401).json({ message: "Invalid token" });
+  } catch {
+    res.status(401).json({ message: "Invalid token" });
   }
 }
 
-/* ================= PROTECTED ROUTES ================= */
+/* ================= PROTECTED GET ROUTES ================= */
 
 app.get("/api/founders", verifyToken, (req, res) => {
   res.json(readData("founders.json"));
@@ -106,46 +92,93 @@ app.get("/api/mentors", verifyToken, (req, res) => {
   res.json(readData("mentors.json"));
 });
 
-/* ================= PUBLIC ROUTES ================= */
+/* ================= PUBLIC POST ROUTES ================= */
 
-function createEntity(fileName) {
-  return (req, res) => {
-    const items = readData(fileName);
+app.post("/api/founders", (req, res) => {
+  const founders = readData("founders.json");
 
-    const newItem = {
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
-      ...req.body,
-    };
-
-    items.push(newItem);
-    writeData(fileName, items);
-
-    res.status(201).json(newItem);
+  const newFounder = {
+    id: uuidv4(),
+    createdAt: new Date().toISOString(),
+    ...req.body,
   };
-}
 
-app.post("/api/founders", createEntity("founders.json"));
-app.post("/api/investors", createEntity("investors.json"));
-app.post("/api/mentors", createEntity("mentors.json"));
+  founders.push(newFounder);
+  writeData("founders.json", founders);
+
+  res.status(201).json(newFounder);
+});
+
+app.post("/api/investors", (req, res) => {
+  const investors = readData("investors.json");
+
+  const newInvestor = {
+    id: uuidv4(),
+    createdAt: new Date().toISOString(),
+    ...req.body,
+  };
+
+  investors.push(newInvestor);
+  writeData("investors.json", investors);
+
+  res.status(201).json(newInvestor);
+});
+
+app.post("/api/mentors", (req, res) => {
+  const mentors = readData("mentors.json");
+
+  const newMentor = {
+    id: uuidv4(),
+    createdAt: new Date().toISOString(),
+    ...req.body,
+  };
+
+  mentors.push(newMentor);
+  writeData("mentors.json", mentors);
+
+  res.status(201).json(newMentor);
+});
 
 /* ================= DELETE ROUTES ================= */
 
-function deleteEntity(fileName) {
-  return (req, res) => {
-    const items = readData(fileName);
-    const updated = items.filter(item => item.id !== req.params.id);
-    writeData(fileName, updated);
-    res.json({ message: "Deleted successfully" });
-  };
-}
+app.delete("/api/founders/:id", verifyToken, (req, res) => {
+  const founders = readData("founders.json");
 
-app.delete("/api/founders/:id", verifyToken, deleteEntity("founders.json"));
-app.delete("/api/investors/:id", verifyToken, deleteEntity("investors.json"));
-app.delete("/api/mentors/:id", verifyToken, deleteEntity("mentors.json"));
+  const updated = founders.filter(
+    (founder) => founder.id !== req.params.id
+  );
+
+  writeData("founders.json", updated);
+
+  res.json({ message: "Founder deleted successfully" });
+});
+
+app.delete("/api/investors/:id", verifyToken, (req, res) => {
+  const investors = readData("investors.json");
+
+  const updated = investors.filter(
+    (investor) => investor.id !== req.params.id
+  );
+
+  writeData("investors.json", updated);
+
+  res.json({ message: "Investor deleted successfully" });
+});
+
+app.delete("/api/mentors/:id", verifyToken, (req, res) => {
+  const mentors = readData("mentors.json");
+
+  const updated = mentors.filter(
+    (mentor) => mentor.id !== req.params.id
+  );
+
+  writeData("mentors.json", updated);
+
+  res.json({ message: "Mentor deleted successfully" });
+});
 
 /* ================= START SERVER ================= */
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
