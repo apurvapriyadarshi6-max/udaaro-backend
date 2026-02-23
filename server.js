@@ -9,8 +9,13 @@ const app = express();
 
 /* ================= CONFIG ================= */
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT;
 const SECRET = process.env.SECRET || "udaaro_secret_key";
+
+if (!PORT) {
+  console.error("❌ PORT is not defined!");
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -22,7 +27,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/healthz", (req, res) => {
-  res.status(200).send("OK");
+  res.status(200).json({ status: "OK" });
 });
 
 /* ================= DATA FOLDER ================= */
@@ -42,8 +47,7 @@ function readData(fileName) {
     fs.writeFileSync(filePath, "[]");
   }
 
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return raw ? JSON.parse(raw) : [];
+  return JSON.parse(fs.readFileSync(filePath, "utf-8") || "[]");
 }
 
 function writeData(fileName, data) {
@@ -83,7 +87,7 @@ function verifyToken(req, res, next) {
   try {
     jwt.verify(token, SECRET);
     next();
-  } catch {
+  } catch (err) {
     return res.status(401).json({ message: "Invalid token" });
   }
 }
@@ -104,73 +108,41 @@ app.get("/api/mentors", verifyToken, (req, res) => {
 
 /* ================= PUBLIC ROUTES ================= */
 
-app.post("/api/founders", (req, res) => {
-  const founders = readData("founders.json");
+function createEntity(fileName) {
+  return (req, res) => {
+    const items = readData(fileName);
 
-  const newFounder = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    ...req.body,
+    const newItem = {
+      id: uuidv4(),
+      createdAt: new Date().toISOString(),
+      ...req.body,
+    };
+
+    items.push(newItem);
+    writeData(fileName, items);
+
+    res.status(201).json(newItem);
   };
+}
 
-  founders.push(newFounder);
-  writeData("founders.json", founders);
-
-  res.status(201).json(newFounder);
-});
-
-app.post("/api/investors", (req, res) => {
-  const investors = readData("investors.json");
-
-  const newInvestor = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    ...req.body,
-  };
-
-  investors.push(newInvestor);
-  writeData("investors.json", investors);
-
-  res.status(201).json(newInvestor);
-});
-
-app.post("/api/mentors", (req, res) => {
-  const mentors = readData("mentors.json");
-
-  const newMentor = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    ...req.body,
-  };
-
-  mentors.push(newMentor);
-  writeData("mentors.json", mentors);
-
-  res.status(201).json(newMentor);
-});
+app.post("/api/founders", createEntity("founders.json"));
+app.post("/api/investors", createEntity("investors.json"));
+app.post("/api/mentors", createEntity("mentors.json"));
 
 /* ================= DELETE ROUTES ================= */
 
-app.delete("/api/founders/:id", verifyToken, (req, res) => {
-  const founders = readData("founders.json");
-  const updated = founders.filter(f => f.id !== req.params.id);
-  writeData("founders.json", updated);
-  res.json({ message: "Founder deleted successfully" });
-});
+function deleteEntity(fileName) {
+  return (req, res) => {
+    const items = readData(fileName);
+    const updated = items.filter(item => item.id !== req.params.id);
+    writeData(fileName, updated);
+    res.json({ message: "Deleted successfully" });
+  };
+}
 
-app.delete("/api/investors/:id", verifyToken, (req, res) => {
-  const investors = readData("investors.json");
-  const updated = investors.filter(i => i.id !== req.params.id);
-  writeData("investors.json", updated);
-  res.json({ message: "Investor deleted successfully" });
-});
-
-app.delete("/api/mentors/:id", verifyToken, (req, res) => {
-  const mentors = readData("mentors.json");
-  const updated = mentors.filter(m => m.id !== req.params.id);
-  writeData("mentors.json", updated);
-  res.json({ message: "Mentor deleted successfully" });
-});
+app.delete("/api/founders/:id", verifyToken, deleteEntity("founders.json"));
+app.delete("/api/investors/:id", verifyToken, deleteEntity("investors.json"));
+app.delete("/api/mentors/:id", verifyToken, deleteEntity("mentors.json"));
 
 /* ================= START SERVER ================= */
 
