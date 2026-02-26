@@ -15,25 +15,23 @@ const SECRET = process.env.SECRET || "udaaro_secret_key";
 /* ================= CORS CONFIG ================= */
 
 const allowedOrigins = [
-  "http://localhost:5173", // Vite local
-  "http://localhost:3000", // CRA local (optional)
-  "https://udaaro.vercel.app" // Your production frontend
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://udaaro-frontend.vercel.app"
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // allow server-to-server
+      if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
       }
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
 );
-
 app.use(express.json());
 
 /* ================= DATA DIRECTORY ================= */
