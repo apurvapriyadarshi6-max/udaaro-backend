@@ -17,7 +17,7 @@ const SECRET = process.env.SECRET || "udaaro_secret_key";
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "https://udaaro-frontend.vercel.app"
+  "https://udaaro.vercel.app"
 ];
 
 app.use(
