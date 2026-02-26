@@ -81,30 +81,17 @@ app.get("/healthz", (req, res) => {
 /* ================= AUTH ================= */
 
 app.post("/api/admin/login", (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const adminFile = path.join(dataPath, "admin.json");
-
-    if (!fs.existsSync(adminFile)) {
-      return res.status(500).json({ message: "Admin not configured" });
-    }
-
-    const admin = JSON.parse(fs.readFileSync(adminFile, "utf-8"));
-
-    if (
-      email?.trim() === admin.email &&
-      password?.trim() === admin.password
-    ) {
-      const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
-      return res.json({ token });
-    }
-
-    return res.status(401).json({ message: "Invalid credentials" });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Login failed" });
+  if (
+    email === process.env.ADMIN_EMAIL &&
+    password === process.env.ADMIN_PASSWORD
+  ) {
+    const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
+    return res.json({ token });
   }
+
+  return res.status(401).json({ message: "Invalid credentials" });
 });
 
 /* ================= TOKEN VERIFY ================= */
