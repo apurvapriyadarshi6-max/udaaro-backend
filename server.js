@@ -30,7 +30,7 @@ app.use(
 
 app.use(express.json());
 
-/* ================= DATA FOLDER ================= */
+/* ================= DATA DIRECTORY ================= */
 
 const dataPath = path.join(__dirname, "data");
 
@@ -50,8 +50,8 @@ function readData(fileName) {
 
     const raw = fs.readFileSync(filePath, "utf-8");
     return raw ? JSON.parse(raw) : [];
-  } catch (err) {
-    console.error("Read error:", err);
+  } catch (error) {
+    console.error("Read error:", error);
     return [];
   }
 }
@@ -60,12 +60,12 @@ function writeData(fileName, data) {
   try {
     const filePath = path.join(dataPath, fileName);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error("Write error:", err);
+  } catch (error) {
+    console.error("Write error:", error);
   }
 }
 
-/* ================= ROOT ================= */
+/* ================= ROOT ROUTES ================= */
 
 app.get("/", (req, res) => {
   res.status(200).send("Udaaro Backend Live 🚀");
@@ -93,12 +93,15 @@ app.post("/api/admin/login", (req, res) => {
       email?.trim() === admin.email &&
       password?.trim() === admin.password
     ) {
-      const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
+      const token = jwt.sign({ email }, SECRET, {
+        expiresIn: "1h",
+      });
+
       return res.json({ token });
     }
 
     return res.status(401).json({ message: "Invalid credentials" });
-  } catch (err) {
+  } catch (error) {
     return res.status(500).json({ message: "Login failed" });
   }
 });
@@ -117,12 +120,12 @@ function verifyToken(req, res, next) {
   try {
     jwt.verify(token, SECRET);
     next();
-  } catch (err) {
+  } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 }
 
-/* ================= GET ROUTES (Protected) ================= */
+/* ================= PROTECTED GET ROUTES ================= */
 
 app.get("/api/founders", verifyToken, (req, res) => {
   res.json(readData("founders.json"));
@@ -136,12 +139,11 @@ app.get("/api/mentors", verifyToken, (req, res) => {
   res.json(readData("mentors.json"));
 });
 
-/* ================= POST ROUTES ================= */
+/* ================= PUBLIC POST ROUTES ================= */
 
 /* ===== Founder ===== */
 app.post("/api/founders", (req, res) => {
   const founders = readData("founders.json");
-
   const {
     name,
     email,
@@ -179,7 +181,6 @@ app.post("/api/founders", (req, res) => {
 /* ===== Investor ===== */
 app.post("/api/investors", (req, res) => {
   const investors = readData("investors.json");
-
   const {
     name,
     email,
@@ -213,7 +214,6 @@ app.post("/api/investors", (req, res) => {
 /* ===== Mentor ===== */
 app.post("/api/mentors", (req, res) => {
   const mentors = readData("mentors.json");
-
   const {
     name,
     email,
@@ -269,6 +269,6 @@ app.delete("/api/mentors/:id", verifyToken, (req, res) => {
 
 /* ================= START SERVER ================= */
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
