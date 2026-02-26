@@ -12,18 +12,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET = process.env.SECRET || "udaaro_secret_key";
 
-const FRONTEND_URL =
-  process.env.FRONTEND_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "https://udaaro.vercel.app"
-    : "http://localhost:3000");
+/* ================= CORS CONFIG ================= */
 
-/* ================= MIDDLEWARE ================= */
+const allowedOrigins = [
+  "http://localhost:5173", // Vite local
+  "http://localhost:3000", // CRA local (optional)
+  "https://udaaro.vercel.app" // Your production frontend
+];
 
 app.use(
   cors({
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST", "DELETE"],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow server-to-server
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
@@ -48,8 +54,7 @@ function readData(fileName) {
       fs.writeFileSync(filePath, JSON.stringify([], null, 2));
     }
 
-    const raw = fs.readFileSync(filePath, "utf-8");
-    return raw ? JSON.parse(raw) : [];
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
   } catch (error) {
     console.error("Read error:", error);
     return [];
@@ -65,14 +70,14 @@ function writeData(fileName, data) {
   }
 }
 
-/* ================= ROOT ROUTES ================= */
+/* ================= ROOT ================= */
 
 app.get("/", (req, res) => {
-  res.status(200).send("Udaaro Backend Live 🚀");
+  res.send("Udaaro Backend Live 🚀");
 });
 
 app.get("/healthz", (req, res) => {
-  res.status(200).json({ status: "OK" });
+  res.json({ status: "OK" });
 });
 
 /* ================= AUTH ================= */
@@ -93,15 +98,13 @@ app.post("/api/admin/login", (req, res) => {
       email?.trim() === admin.email &&
       password?.trim() === admin.password
     ) {
-      const token = jwt.sign({ email }, SECRET, {
-        expiresIn: "1h",
-      });
-
+      const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" });
       return res.json({ token });
     }
 
     return res.status(401).json({ message: "Invalid credentials" });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ message: "Login failed" });
   }
 });
@@ -111,7 +114,7 @@ app.post("/api/admin/login", (req, res) => {
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Access denied" });
   }
 
@@ -125,7 +128,7 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* ================= PROTECTED GET ROUTES ================= */
+/* ================= PROTECTED ROUTES ================= */
 
 app.get("/api/founders", verifyToken, (req, res) => {
   res.json(readData("founders.json"));
@@ -141,19 +144,9 @@ app.get("/api/mentors", verifyToken, (req, res) => {
 
 /* ================= PUBLIC POST ROUTES ================= */
 
-/* ===== Founder ===== */
 app.post("/api/founders", (req, res) => {
   const founders = readData("founders.json");
-  const {
-    name,
-    email,
-    phone,
-    startup,
-    industry,
-    stage,
-    fundingNeeded,
-    description,
-  } = req.body;
+  const { name, email, ...rest } = req.body;
 
   if (!name || !email) {
     return res.status(400).json({ message: "Name and Email required" });
@@ -164,12 +157,7 @@ app.post("/api/founders", (req, res) => {
     createdAt: new Date().toISOString(),
     name: name.trim(),
     email: email.trim(),
-    phone,
-    startup,
-    industry,
-    stage,
-    fundingNeeded,
-    description,
+    ...rest,
   };
 
   founders.push(newFounder);
@@ -178,17 +166,9 @@ app.post("/api/founders", (req, res) => {
   res.status(201).json(newFounder);
 });
 
-/* ===== Investor ===== */
 app.post("/api/investors", (req, res) => {
   const investors = readData("investors.json");
-  const {
-    name,
-    email,
-    firm,
-    investmentFocus,
-    preferredStage,
-    ticketSize,
-  } = req.body;
+  const { name, email, ...rest } = req.body;
 
   if (!name || !email) {
     return res.status(400).json({ message: "Name and Email required" });
@@ -199,10 +179,7 @@ app.post("/api/investors", (req, res) => {
     createdAt: new Date().toISOString(),
     name: name.trim(),
     email: email.trim(),
-    firm,
-    investmentFocus,
-    preferredStage,
-    ticketSize,
+    ...rest,
   };
 
   investors.push(newInvestor);
@@ -211,17 +188,9 @@ app.post("/api/investors", (req, res) => {
   res.status(201).json(newInvestor);
 });
 
-/* ===== Mentor ===== */
 app.post("/api/mentors", (req, res) => {
   const mentors = readData("mentors.json");
-  const {
-    name,
-    email,
-    expertise,
-    experienceLevel,
-    preferredStage,
-    availability,
-  } = req.body;
+  const { name, email, ...rest } = req.body;
 
   if (!name || !email) {
     return res.status(400).json({ message: "Name and Email required" });
@@ -232,10 +201,7 @@ app.post("/api/mentors", (req, res) => {
     createdAt: new Date().toISOString(),
     name: name.trim(),
     email: email.trim(),
-    expertise,
-    experienceLevel,
-    preferredStage,
-    availability,
+    ...rest,
   };
 
   mentors.push(newMentor);
@@ -246,29 +212,29 @@ app.post("/api/mentors", (req, res) => {
 
 /* ================= DELETE ROUTES ================= */
 
-app.delete("/api/founders/:id", verifyToken, (req, res) => {
-  const founders = readData("founders.json");
-  const updated = founders.filter(f => f.id !== req.params.id);
-  writeData("founders.json", updated);
-  res.json({ message: "Founder deleted successfully" });
-});
+app.delete("/api/:type/:id", verifyToken, (req, res) => {
+  const { type, id } = req.params;
 
-app.delete("/api/investors/:id", verifyToken, (req, res) => {
-  const investors = readData("investors.json");
-  const updated = investors.filter(i => i.id !== req.params.id);
-  writeData("investors.json", updated);
-  res.json({ message: "Investor deleted successfully" });
-});
+  const fileMap = {
+    founders: "founders.json",
+    investors: "investors.json",
+    mentors: "mentors.json",
+  };
 
-app.delete("/api/mentors/:id", verifyToken, (req, res) => {
-  const mentors = readData("mentors.json");
-  const updated = mentors.filter(m => m.id !== req.params.id);
-  writeData("mentors.json", updated);
-  res.json({ message: "Mentor deleted successfully" });
+  if (!fileMap[type]) {
+    return res.status(400).json({ message: "Invalid type" });
+  }
+
+  const data = readData(fileMap[type]);
+  const updated = data.filter(item => item.id !== id);
+
+  writeData(fileMap[type], updated);
+
+  res.json({ message: "Deleted successfully" });
 });
 
 /* ================= START SERVER ================= */
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
