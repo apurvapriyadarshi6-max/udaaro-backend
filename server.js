@@ -1,18 +1,17 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
+const mongoose = require("mongoose");
 
 const app = express();
 
 /* ================= CONFIG ================= */
 
 const PORT = process.env.PORT || 5000;
-const SECRET = process.env.SECRET || "udaaro_secret_key";
+const SECRET = process.env.SECRET;
+const MONGO_URI = process.env.MONGO_URI;
 
-/* ================= CORS CONFIG ================= */
+/* ================= CORS ================= */
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -32,41 +31,59 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json());
 
-/* ================= DATA DIRECTORY ================= */
+/* ================= CONNECT MONGODB ================= */
 
-const dataPath = path.join(__dirname, "data");
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("❌ MongoDB Error:", err));
 
-if (!fs.existsSync(dataPath)) {
-  fs.mkdirSync(dataPath, { recursive: true });
-}
+/* ================= SCHEMAS ================= */
 
-/* ================= FILE HELPERS ================= */
+const founderSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: String,
+    phone: String,
+    startup: String,
+    industry: String,
+    stage: String,
+    fundingNeeded: String,
+    description: String,
+  },
+  { timestamps: true }
+);
 
-function readData(fileName) {
-  try {
-    const filePath = path.join(dataPath, fileName);
+const investorSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: String,
+    firm: String,
+    investmentFocus: String,
+    preferredStage: String,
+    ticketSize: String,
+  },
+  { timestamps: true }
+);
 
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, JSON.stringify([], null, 2));
-    }
+const mentorSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: String,
+    expertise: String,
+    experienceLevel: String,
+    preferredStage: String,
+    availability: String,
+  },
+  { timestamps: true }
+);
 
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-  } catch (error) {
-    console.error("Read error:", error);
-    return [];
-  }
-}
-
-function writeData(fileName, data) {
-  try {
-    const filePath = path.join(dataPath, fileName);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error("Write error:", error);
-  }
-}
+const Founder = mongoose.model("Founder", founderSchema);
+const Investor = mongoose.model("Investor", investorSchema);
+const Mentor = mongoose.model("Mentor", mentorSchema);
 
 /* ================= ROOT ================= */
 
@@ -74,11 +91,7 @@ app.get("/", (req, res) => {
   res.send("Udaaro Backend Live 🚀");
 });
 
-app.get("/healthz", (req, res) => {
-  res.json({ status: "OK" });
-});
-
-/* ================= AUTH ================= */
+/* ================= ADMIN LOGIN ================= */
 
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
@@ -108,117 +121,65 @@ function verifyToken(req, res, next) {
   try {
     jwt.verify(token, SECRET);
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 }
 
-/* ================= PROTECTED ROUTES ================= */
+/* ================= GET ROUTES ================= */
 
-app.get("/api/founders", verifyToken, (req, res) => {
-  res.json(readData("founders.json"));
+app.get("/api/founders", verifyToken, async (req, res) => {
+  const data = await Founder.find().sort({ createdAt: -1 });
+  res.json(data);
 });
 
-app.get("/api/investors", verifyToken, (req, res) => {
-  res.json(readData("investors.json"));
+app.get("/api/investors", verifyToken, async (req, res) => {
+  const data = await Investor.find().sort({ createdAt: -1 });
+  res.json(data);
 });
 
-app.get("/api/mentors", verifyToken, (req, res) => {
-  res.json(readData("mentors.json"));
+app.get("/api/mentors", verifyToken, async (req, res) => {
+  const data = await Mentor.find().sort({ createdAt: -1 });
+  res.json(data);
 });
 
-/* ================= PUBLIC POST ROUTES ================= */
+/* ================= POST ROUTES ================= */
 
-app.post("/api/founders", (req, res) => {
-  const founders = readData("founders.json");
-  const { name, email, ...rest } = req.body;
-
-  if (!name || !email) {
-    return res.status(400).json({ message: "Name and Email required" });
-  }
-
-  const newFounder = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    name: name.trim(),
-    email: email.trim(),
-    ...rest,
-  };
-
-  founders.push(newFounder);
-  writeData("founders.json", founders);
-
-  res.status(201).json(newFounder);
+app.post("/api/founders", async (req, res) => {
+  const founder = await Founder.create(req.body);
+  res.status(201).json(founder);
 });
 
-app.post("/api/investors", (req, res) => {
-  const investors = readData("investors.json");
-  const { name, email, ...rest } = req.body;
-
-  if (!name || !email) {
-    return res.status(400).json({ message: "Name and Email required" });
-  }
-
-  const newInvestor = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    name: name.trim(),
-    email: email.trim(),
-    ...rest,
-  };
-
-  investors.push(newInvestor);
-  writeData("investors.json", investors);
-
-  res.status(201).json(newInvestor);
+app.post("/api/investors", async (req, res) => {
+  const investor = await Investor.create(req.body);
+  res.status(201).json(investor);
 });
 
-app.post("/api/mentors", (req, res) => {
-  const mentors = readData("mentors.json");
-  const { name, email, ...rest } = req.body;
-
-  if (!name || !email) {
-    return res.status(400).json({ message: "Name and Email required" });
-  }
-
-  const newMentor = {
-    id: uuidv4(),
-    createdAt: new Date().toISOString(),
-    name: name.trim(),
-    email: email.trim(),
-    ...rest,
-  };
-
-  mentors.push(newMentor);
-  writeData("mentors.json", mentors);
-
-  res.status(201).json(newMentor);
+app.post("/api/mentors", async (req, res) => {
+  const mentor = await Mentor.create(req.body);
+  res.status(201).json(mentor);
 });
 
 /* ================= DELETE ROUTES ================= */
 
-app.delete("/api/:type/:id", verifyToken, (req, res) => {
+app.delete("/api/:type/:id", verifyToken, async (req, res) => {
   const { type, id } = req.params;
 
-  const fileMap = {
-    founders: "founders.json",
-    investors: "investors.json",
-    mentors: "mentors.json",
+  const modelMap = {
+    founders: Founder,
+    investors: Investor,
+    mentors: Mentor,
   };
 
-  if (!fileMap[type]) {
+  if (!modelMap[type]) {
     return res.status(400).json({ message: "Invalid type" });
   }
 
-  const data = readData(fileMap[type]);
-  const updated = data.filter(item => item.id !== id);
-
-  writeData(fileMap[type], updated);
-
+  await modelMap[type].findByIdAndDelete(id);
   res.json({ message: "Deleted successfully" });
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
