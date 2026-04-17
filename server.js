@@ -178,9 +178,25 @@ app.delete("/api/:type/:id", verifyToken, async (req, res) => {
   await modelMap[type].findByIdAndDelete(id);
   res.json({ message: "Deleted successfully" });
 });
+/* ================= KEEP-ALIVE SYSTEM ================= */
+
+const https = require("https");
+
+// This function pings the server root "/" every 5 minutes
+setInterval(() => {
+  // Use your actual deployed URL here (e.g., https://udaaro-backend.onrender.com)
+  const URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  
+  https.get(URL, (res) => {
+    console.log(`📡 Keep-Alive Ping: ${res.statusCode} - System Pulse Stabilized`);
+  }).on('error', (err) => {
+    console.error("❌ Keep-Alive Error:", err.message);
+  });
+}, 300000); // 300,000ms = 5 minutes
 
 /* ================= START ================= */
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🛠️ Node Identity: Sovereign_Venture_Node_01`);
 });
